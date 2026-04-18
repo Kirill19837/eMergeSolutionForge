@@ -65,7 +65,7 @@ class HybridTeamOrchestrator:
     @staticmethod
     def _infer_actor_group(actor: str) -> str:
         normalized = actor.lower()
-        if "human" in normalized or "engineer" in normalized or "pm" in normalized:
+        if re.search(r"\bhuman\b|\bengineer\b|\bpm\b", normalized):
             return "human team"
         return "AI agents"
 
@@ -178,7 +178,9 @@ class HybridTeamOrchestrator:
             "done": [],
         }
         for card in process.cards:
-            board.setdefault(card.column, []).append(card)
+            if card.column not in board:
+                raise ValueError(f"Unsupported kanban column: {card.column}")
+            board[card.column].append(card)
         return board
 
     def move_task_to_work(
@@ -215,7 +217,7 @@ class HybridTeamOrchestrator:
         human_actor: str,
         note: str,
     ) -> tuple[ProcessState, Notification]:
-        if "ai" not in ai_actor.lower():
+        if ai_actor not in self.AI_ACTORS and not ai_actor.lower().endswith(" ai"):
             raise ValueError("Only AI actors can request human input")
 
         updated_cards = []
