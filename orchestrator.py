@@ -15,6 +15,29 @@ class BoardItem:
     task: str
 
 
+@dataclass(frozen=True)
+class Notification:
+    recipient: str
+    requested_by: str
+    task: str
+    message: str
+
+
+@dataclass(frozen=True)
+class TaskCard:
+    task: str
+    actor: str
+    actor_group: str
+    column: str
+    needs_human_input: bool = False
+
+
+@dataclass(frozen=True)
+class ProcessState:
+    cards: list[TaskCard]
+    notifications: list[Notification]
+
+
 class HybridTeamOrchestrator:
     AI_ACTORS = [
         "Senior Dev AI",
@@ -61,9 +84,7 @@ class HybridTeamOrchestrator:
                 Assignment("PM human", "confirm duplicate merge policy")
             )
 
-        if re.search(r"\bcsv\b", normalized) or re.search(
-            r"\bimport\w*\b", normalized
-        ):
+        if re.search(r"\bcsv\b|\bimport\w*\b", normalized):
             assignments.append(
                 Assignment("Backend AI", "implement parser and validator")
             )
@@ -135,3 +156,97 @@ class HybridTeamOrchestrator:
                 )
                 return updated, status
         raise ValueError(f"Task not found: {task}")
+
+    def create_process(self, work_item: str) -> ProcessState:
+        assignments = self.distribute(work_item)
+        cards = [
+            TaskCard(
+                task=assignment.task,
+                actor=assignment.executor,
+                actor_group=self._infer_actor_group(assignment.executor),
+                column="todo",
+            )
+            for assignment in assignments
+        ]
+        return ProcessState(cards=cards, notifications=[])
+
+    def kanban_board(self, process: ProcessState) -> dict[str, list[TaskCard]]:
+        board: dict[str, list[TaskCard]] = {
+            "todo": [],
+            "in_progress": [],
+            "human_input": [],
+            "done": [],
+        }
+        for card in process.cards:
+            board.setdefault(card.column, []).append(card)
+        return board
+
+    def move_task_to_work(
+        self, process: ProcessState, task: str
+    ) -> tuple[ProcessState, str]:
+        updated_cards = []
+        start_status = None
+        for card in process.cards:
+            if card.task == task:
+                updated_cards.append(
+                    TaskCard(
+                        task=card.task,
+                        actor=card.actor,
+                        actor_group=card.actor_group,
+                        column="in_progress",
+                        needs_human_input=False,
+                    )
+                )
+                start_status = f"{card.actor} started {task}"
+            else:
+                updated_cards.append(card)
+        if start_status is None:
+            raise ValueError(f"Task not found: {task}")
+        return (
+            ProcessState(cards=updated_cards, notifications=process.notifications),
+            start_status,
+        )
+
+    def request_human_input(
+        self,
+        process: ProcessState,
+        task: str,
+        ai_actor: str,
+        human_actor: str,
+        note: str,
+    ) -> tuple[ProcessState, Notification]:
+        if "ai" not in ai_actor.lower():
+            raise ValueError("Only AI actors can request human input")
+
+        updated_cards = []
+        found = False
+        for card in process.cards:
+            if card.task == task:
+                updated_cards.append(
+                    TaskCard(
+                        task=card.task,
+                        actor=human_actor,
+                        actor_group=self._infer_actor_group(human_actor),
+                        column="human_input",
+                        needs_human_input=True,
+                    )
+                )
+                found = True
+            else:
+                updated_cards.append(card)
+        if not found:
+            raise ValueError(f"Task not found: {task}")
+
+        notification = Notification(
+            recipient=human_actor,
+            requested_by=ai_actor,
+            task=task,
+            message=f"{ai_actor} requested human input: {note}",
+        )
+        return (
+            ProcessState(
+                cards=updated_cards,
+                notifications=[*process.notifications, notification],
+            ),
+            notification,
+        )

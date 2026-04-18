@@ -1,6 +1,11 @@
 import unittest
 
-from orchestrator import Assignment, BoardItem, HybridTeamOrchestrator
+from orchestrator import (
+    Assignment,
+    BoardItem,
+    HybridTeamOrchestrator,
+    Notification,
+)
 
 
 class HybridTeamOrchestratorTests(unittest.TestCase):
@@ -47,10 +52,13 @@ class HybridTeamOrchestratorTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            assignments[0:2],
+            assignments,
             [
                 Assignment("PM human", "confirm duplicate merge policy"),
                 Assignment("Backend AI", "implement parser and validator"),
+                Assignment("QA AI", "create test cases"),
+                Assignment("Human engineer", "review edge-case logic"),
+                Assignment("Docs AI", "write release notes"),
             ],
         )
 
@@ -157,6 +165,49 @@ class HybridTeamOrchestratorTests(unittest.TestCase):
         self.assertIn("Senior Dev human", human_actors)
         self.assertIn("Architect human", human_actors)
         self.assertIn("QA human", human_actors)
+
+    def test_create_process_builds_kanban_board(self):
+        orchestrator = HybridTeamOrchestrator()
+
+        process = orchestrator.create_process(
+            "Build CSV import with validation and duplicate detection."
+        )
+        board = orchestrator.kanban_board(process)
+
+        self.assertEqual(len(board["todo"]), 5)
+        self.assertEqual(len(board["in_progress"]), 0)
+        self.assertEqual(len(board["human_input"]), 0)
+        self.assertEqual(len(board["done"]), 0)
+
+    def test_ai_can_request_human_input_and_notification_is_created(self):
+        orchestrator = HybridTeamOrchestrator()
+        process = orchestrator.create_process(
+            "Build CSV import with validation and duplicate detection."
+        )
+        process, _ = orchestrator.move_task_to_work(
+            process, "implement parser and validator"
+        )
+
+        updated_process, notification = orchestrator.request_human_input(
+            process=process,
+            task="implement parser and validator",
+            ai_actor="Backend AI",
+            human_actor="Architect human",
+            note="Need clarification on fallback parsing strategy",
+        )
+
+        self.assertEqual(
+            notification,
+            Notification(
+                recipient="Architect human",
+                requested_by="Backend AI",
+                task="implement parser and validator",
+                message="Backend AI requested human input: Need clarification on fallback parsing strategy",
+            ),
+        )
+        board = orchestrator.kanban_board(updated_process)
+        self.assertEqual(len(board["human_input"]), 1)
+        self.assertEqual(board["human_input"][0].actor, "Architect human")
 
 
 if __name__ == "__main__":
