@@ -21,3 +21,18 @@ Status changes:
 - QA AI finished
 - human review pending
 - release package ready
+
+Project board (tasks + actors):
+
+- human team | PM human | confirm duplicate merge policy
+- AI agents | Backend AI | implement parser and validator
+- AI agents | QA AI | create test cases
+- human team | Human engineer | review edge-case logic
+- AI agents | Docs AI | write release notes
+
+Manual assignment support:
+
+- Reassign existing task to a specific human/agent
+- Add a new task with a specific human/agent assignment
+- Start a task in work and get `"<actor> started <task>"` status output
+- Complete a task and automatically assign the next stage (for example, `verify task completion`)
