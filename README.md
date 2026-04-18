@@ -1,6 +1,37 @@
 # eMergeSolutionForge
 Hybrid Team Orchestrator breaks incoming work into subtasks, then assigns each one to the best executor: human, AI agent, or both. It routes by ambiguity, risk, and skill, keeps people in the loop, tracks execution, and merges outputs into one delivery flow for modern product teams.
 
+## Running the UI
+
+### Requirements
+
+```
+pip install fastapi "uvicorn[standard]"
+```
+
+### Start the server
+
+```bash
+uvicorn api:app --reload
+```
+
+Then open **http://localhost:8000** in your browser.
+
+The interactive API docs (Swagger UI) are available at **http://localhost:8000/docs**.
+
+### REST API overview
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/actors/ai` | List all AI actors |
+| `GET` | `/actors/human` | List all human actors |
+| `POST` | `/processes` | Create a process from a work-item description |
+| `GET` | `/processes/{id}/board` | Fetch the kanban board + notifications |
+| `POST` | `/processes/{id}/tasks/{task}/start` | Move a task card to *In Progress* |
+| `PATCH` | `/processes/{id}/tasks/{task}` | Reassign a task to a different actor |
+| `POST` | `/processes/{id}/tasks/{task}/complete` | Complete a task and assign the next stage |
+| `POST` | `/processes/{id}/tasks/{task}/request-input` | AI actor requests human input (moves card to *Human Input* and creates a notification) |
+
 ## MVP demo
 
 Input:

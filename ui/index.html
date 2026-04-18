@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>eMergeSolutionForge — Orchestrator</title>
+  <style>
+    /* ── reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ── topbar ── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    #topbar .logo { font-weight: 700; font-size: 1.1rem; color: #38bdf8; letter-spacing: .5px; }
+    #topbar .process-label { font-size: .85rem; color: #94a3b8; margin-left: 12px; }
+    #bell-btn {
+      position: relative;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #94a3b8;
+      font-size: 1.4rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background .15s;
+    }
+    #bell-btn:hover { background: #334155; color: #e2e8f0; }
+    #notif-badge {
+      display: none;
+      position: absolute;
+      top: 2px; right: 4px;
+      background: #ef4444;
+      color: #fff;
+      font-size: .6rem;
+      font-weight: 700;
+      min-width: 16px;
+      height: 16px;
+      border-radius: 8px;
+      line-height: 16px;
+      text-align: center;
+      padding: 0 3px;
+    }
+
+    /* ── views ── */
+    .view { display: none; padding: 32px 24px; max-width: 1100px; margin: 0 auto; }
+    .view.active { display: block; }
+
+    /* ── new-process view ── */
+    #view-new h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    #view-new p  { color: #94a3b8; margin-bottom: 24px; }
+    #work-item-input {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px 16px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 1rem;
+      resize: vertical;
+    }
+    #work-item-input:focus { outline: none; border-color: #38bdf8; }
+    #create-btn {
+      margin-top: 16px;
+      padding: 10px 28px;
+      background: #0ea5e9;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    #create-btn:hover { background: #38bdf8; }
+    #create-btn:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+    #create-error { margin-top: 12px; color: #f87171; font-size: .9rem; display: none; }
+
+    /* ── board view ── */
+    #board-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    #board-header h2 { font-size: 1.3rem; }
+    #new-process-link {
+      background: none; border: 1px solid #334155; color: #94a3b8;
+      padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: .85rem;
+      transition: background .15s;
+    }
+    #new-process-link:hover { background: #1e293b; color: #e2e8f0; }
+    #poll-indicator { margin-left: auto; font-size: .75rem; color: #475569; }
+
+    #kanban {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .col-wrap { background: #1e293b; border-radius: 10px; padding: 12px; }
+    .col-title {
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #334155;
+    }
+    .col-todo    .col-title { color: #94a3b8; }
+    .col-in_progress .col-title { color: #38bdf8; }
+    .col-human_input .col-title { color: #fb923c; }
+    .col-done    .col-title { color: #4ade80; }
+    .col-cards { display: flex; flex-direction: column; gap: 10px; min-height: 60px; }
+
+    /* cards */
+    .card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: .87rem;
+      position: relative;
+      transition: border-color .15s;
+    }
+    .card:hover { border-color: #475569; }
+    .card.needs-input { border-color: #fb923c; }
+    .card-task { font-weight: 600; margin-bottom: 6px; line-height: 1.3; }
+    .actor-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: .72rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .badge-ai    { background: #312e81; color: #a5b4fc; }
+    .badge-human { background: #14532d; color: #86efac; }
+    .card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .card-btn {
+      font-size: .72rem;
+      padding: 3px 10px;
+      border-radius: 4px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: background .12s, color .12s;
+    }
+    .card-btn:hover { background: #334155; color: #e2e8f0; }
+    .card-btn.primary { background: #0c4a6e; border-color: #0ea5e9; color: #38bdf8; }
+    .card-btn.primary:hover { background: #0ea5e9; color: #fff; }
+    .input-alert {
+      font-size: .7rem;
+      color: #fb923c;
+      margin-bottom: 4px;
+      display: none;
+    }
+    .card.needs-input .input-alert { display: block; }
+
+    /* ── notification drawer ── */
+    #notif-drawer {
+      position: fixed;
+      top: 56px; right: 0; bottom: 0;
+      width: 360px;
+      background: #1e293b;
+      border-left: 1px solid #334155;
+      transform: translateX(100%);
+      transition: transform .25s;
+      overflow-y: auto;
+      z-index: 90;
+      padding: 20px 16px;
+    }
+    #notif-drawer.open { transform: translateX(0); }
+    #notif-drawer h3 { font-size: 1rem; margin-bottom: 16px; }
+    .notif-item {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      font-size: .83rem;
+    }
+    .notif-item .notif-task { font-weight: 600; margin-bottom: 4px; }
+    .notif-item .notif-msg  { color: #94a3b8; }
+    .notif-item .notif-from { color: #fb923c; font-size: .75rem; margin-bottom: 4px; }
+    .notif-item .notif-to   { color: #86efac; font-size: .75rem; margin-bottom: 6px; }
+    .notif-empty { color: #475569; font-size: .85rem; }
+
+    /* ── modals ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.6);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+      width: 420px;
+      max-width: 95vw;
+    }
+    .modal h3 { margin-bottom: 16px; font-size: 1rem; }
+    .modal label { display: block; font-size: .82rem; color: #94a3b8; margin-bottom: 4px; }
+    .modal select, .modal input[type=text], .modal textarea {
+      width: 100%;
+      padding: 8px 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: .9rem;
+      margin-bottom: 14px;
+    }
+    .modal select:focus, .modal input:focus, .modal textarea:focus {
+      outline: none; border-color: #38bdf8;
+    }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-cancel {
+      background: none; border: 1px solid #334155; color: #94a3b8;
+      padding: 8px 18px; border-radius: 6px; cursor: pointer;
+    }
+    .modal-confirm {
+      background: #0ea5e9; border: none; color: #fff;
+      padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 600;
+    }
+    .modal-confirm:hover { background: #38bdf8; }
+    .modal-error { color: #f87171; font-size: .8rem; margin-bottom: 10px; display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="logo">⚡ eMergeSolutionForge</span>
+    <span class="process-label" id="process-label"></span>
+  </div>
+  <button id="bell-btn" title="Notifications" aria-label="Notifications">
+    🔔<span id="notif-badge"></span>
+  </button>
+</div>
+
+<!-- View: New Process -->
+<div id="view-new" class="view active">
+  <h1>Create a new process</h1>
+  <p>Describe the work item and the orchestrator will distribute tasks across the hybrid team.</p>
+  <textarea id="work-item-input" placeholder="e.g. Build CSV import with validation and duplicate detection."></textarea>
+  <br />
+  <button id="create-btn">Distribute tasks →</button>
+  <div id="create-error"></div>
+</div>
+
+<!-- View: Kanban Board -->
+<div id="view-board" class="view">
+  <div id="board-header">
+    <h2>📋 Kanban Board</h2>
+    <button id="new-process-link">+ New process</button>
+    <span id="poll-indicator">auto-refresh: on</span>
+  </div>
+  <div id="kanban">
+    <div class="col-wrap col-todo">
+      <div class="col-title">Todo</div>
+      <div class="col-cards" id="col-todo"></div>
+    </div>
+    <div class="col-wrap col-in_progress">
+      <div class="col-title">In Progress</div>
+      <div class="col-cards" id="col-in_progress"></div>
+    </div>
+    <div class="col-wrap col-human_input">
+      <div class="col-title">⚠ Human Input</div>
+      <div class="col-cards" id="col-human_input"></div>
+    </div>
+    <div class="col-wrap col-done">
+      <div class="col-title">Done</div>
+      <div class="col-cards" id="col-done"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Notification Drawer -->
+<div id="notif-drawer">
+  <h3>🔔 Notifications</h3>
+  <div id="notif-list"></div>
+</div>
+
+<!-- Modal: Assign Task -->
+<div class="modal-overlay" id="modal-assign">
+  <div class="modal">
+    <h3>Assign task</h3>
+    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:14px;" id="assign-task-name"></p>
+    <div class="modal-error" id="assign-error"></div>
+    <label>Actor</label>
+    <select id="assign-actor-select"></select>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="assign-cancel">Cancel</button>
+      <button class="modal-confirm" id="assign-confirm">Assign</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Complete Task -->
+<div class="modal-overlay" id="modal-complete">
+  <div class="modal">
+    <h3>Complete task & hand off</h3>
+    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:14px;" id="complete-task-name"></p>
+    <div class="modal-error" id="complete-error"></div>
+    <label>Next stage actor</label>
+    <select id="complete-actor-select"></select>
+    <label>Next stage task</label>
+    <input type="text" id="complete-next-task" value="verify task completion" />
+    <div class="modal-actions">
+      <button class="modal-cancel" id="complete-cancel">Cancel</button>
+      <button class="modal-confirm" id="complete-confirm">Complete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Request Human Input -->
+<div class="modal-overlay" id="modal-request-input">
+  <div class="modal">
+    <h3>Request human input</h3>
+    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:14px;" id="ri-task-name"></p>
+    <div class="modal-error" id="ri-error"></div>
+    <label>AI actor making the request</label>
+    <select id="ri-ai-actor"></select>
+    <label>Human actor to notify</label>
+    <select id="ri-human-actor"></select>
+    <label>Note / clarification needed</label>
+    <textarea id="ri-note" rows="3" placeholder="Describe what you need clarification on…"></textarea>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="ri-cancel">Cancel</button>
+      <button class="modal-confirm" id="ri-confirm">Send request</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ── Constants ─────────────────────────────────────────────────────────────
+  // API base URL — empty string means same origin (served by uvicorn at /).
+  // Change to e.g. 'http://localhost:8000' when running the frontend separately.
+  const API_BASE = '';
+  const POLL_INTERVAL_MS = 5000;
+  const PROCESS_ID_DISPLAY_LENGTH = 8;
+
+  // ── State ────────────────────────────────────────────────────────────────
+  let currentProcessId = null;
+  let allActors = { ai: [], human: [] };
+  let pollTimer = null;
+  let drawerOpen = false;
+
+  // ── API helpers ──────────────────────────────────────────────────────────
+
+  async function api(method, path, body) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const res = await fetch(API_BASE + path, opts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Request failed');
+    return data;
+  }
+
+  // ── View management ──────────────────────────────────────────────────────
+  function showView(id) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ── Actor loader ─────────────────────────────────────────────────────────
+  async function loadActors() {
+    const [ai, human] = await Promise.all([
+      api('GET', '/actors/ai'),
+      api('GET', '/actors/human'),
+    ]);
+    allActors = { ai, human };
+  }
+
+  function populateSelect(selectEl, options) {
+    selectEl.innerHTML = '';
+    options.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o;
+      opt.textContent = o;
+      selectEl.appendChild(opt);
+    });
+  }
+
+  // ── Board rendering ──────────────────────────────────────────────────────
+  function renderBoard(data) {
+    const cols = ['todo', 'in_progress', 'human_input', 'done'];
+    cols.forEach(col => {
+      const el = document.getElementById('col-' + col);
+      el.innerHTML = '';
+      (data.board[col] || []).forEach(card => {
+        el.appendChild(buildCard(card, col));
+      });
+    });
+    renderNotifications(data.notifications || []);
+  }
+
+  function buildCard(card, col) {
+    const div = document.createElement('div');
+    div.className = 'card' + (card.needs_human_input ? ' needs-input' : '');
+
+    const isAI = card.actor_group === 'AI agents';
+    const badgeCls = isAI ? 'badge-ai' : 'badge-human';
+
+    div.innerHTML = `
+      <div class="input-alert">⚠ Awaiting human input</div>
+      <div class="card-task">${escHtml(card.task)}</div>
+      <span class="actor-badge ${badgeCls}">${escHtml(card.actor)}</span>
+      <div style="font-size:.7rem;color:#475569;margin-bottom:6px;">${escHtml(card.actor_group)}</div>
+      <div class="card-actions"></div>
+    `;
+
+    const actions = div.querySelector('.card-actions');
+
+    if (col === 'todo') {
+      addBtn(actions, 'Start', 'primary', () => startTask(card.task));
+    }
+    if (col === 'in_progress') {
+      addBtn(actions, 'Complete', 'primary', () => openCompleteModal(card.task));
+      if (isAI) {
+        addBtn(actions, 'Request input', '', () => openRequestInputModal(card.task, card.actor));
+      }
+    }
+    if (col === 'human_input') {
+      addBtn(actions, 'Start', 'primary', () => startTask(card.task));
+    }
+    // Always show assign
+    if (col !== 'done') {
+      addBtn(actions, 'Assign', '', () => openAssignModal(card.task));
+    }
+
+    return div;
+  }
+
+  function addBtn(container, label, extra, handler) {
+    const btn = document.createElement('button');
+    btn.className = 'card-btn ' + extra;
+    btn.textContent = label;
+    btn.addEventListener('click', handler);
+    container.appendChild(btn);
+  }
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+  function renderNotifications(notifications) {
+    const badge = document.getElementById('notif-badge');
+    const list = document.getElementById('notif-list');
+    if (notifications.length === 0) {
+      badge.style.display = 'none';
+      list.innerHTML = '<div class="notif-empty">No notifications yet.</div>';
+      return;
+    }
+    badge.style.display = 'block';
+    badge.textContent = notifications.length;
+    list.innerHTML = '';
+    notifications.forEach(n => {
+      const item = document.createElement('div');
+      item.className = 'notif-item';
+      item.innerHTML = `
+        <div class="notif-task">${escHtml(n.task)}</div>
+        <div class="notif-from">From: ${escHtml(n.requested_by)}</div>
+        <div class="notif-to">To: ${escHtml(n.recipient)}</div>
+        <div class="notif-msg">${escHtml(n.message)}</div>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  // ── Polling ───────────────────────────────────────────────────────────────
+  async function refreshBoard() {
+    if (!currentProcessId) return;
+    try {
+      const data = await api('GET', `/processes/${currentProcessId}/board`);
+      renderBoard(data);
+    } catch { /* ignore transient errors during polling */ }
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(refreshBoard, POLL_INTERVAL_MS);
+  }
+
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // ── Create process ────────────────────────────────────────────────────────
+  document.getElementById('create-btn').addEventListener('click', async () => {
+    const wi = document.getElementById('work-item-input').value.trim();
+    if (!wi) return;
+    const btn = document.getElementById('create-btn');
+    const errEl = document.getElementById('create-error');
+    btn.disabled = true;
+    errEl.style.display = 'none';
+    try {
+      const data = await api('POST', '/processes', { work_item: wi });
+      currentProcessId = data.id;
+      document.getElementById('process-label').textContent = `Process: ${data.id.slice(0, PROCESS_ID_DISPLAY_LENGTH)}…`;
+      showView('view-board');
+      renderBoard(data);
+      startPolling();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('new-process-link').addEventListener('click', () => {
+    stopPolling();
+    currentProcessId = null;
+    document.getElementById('process-label').textContent = '';
+    document.getElementById('work-item-input').value = '';
+    showView('view-new');
+  });
+
+  // ── Bell / drawer ─────────────────────────────────────────────────────────
+  document.getElementById('bell-btn').addEventListener('click', () => {
+    drawerOpen = !drawerOpen;
+    document.getElementById('notif-drawer').classList.toggle('open', drawerOpen);
+  });
+
+  // ── Start task ────────────────────────────────────────────────────────────
+  async function startTask(task) {
+    await api('POST', `/processes/${currentProcessId}/tasks/${encodeURIComponent(task)}/start`);
+    await refreshBoard();
+  }
+
+  // ── Assign modal ──────────────────────────────────────────────────────────
+  let _assignTask = null;
+
+  function openAssignModal(task) {
+    _assignTask = task;
+    document.getElementById('assign-task-name').textContent = task;
+    document.getElementById('assign-error').style.display = 'none';
+    populateSelect(
+      document.getElementById('assign-actor-select'),
+      [...allActors.ai, ...allActors.human]
+    );
+    document.getElementById('modal-assign').classList.add('open');
+  }
+
+  document.getElementById('assign-cancel').addEventListener('click', () => {
+    document.getElementById('modal-assign').classList.remove('open');
+  });
+
+  document.getElementById('assign-confirm').addEventListener('click', async () => {
+    const actor = document.getElementById('assign-actor-select').value;
+    const errEl = document.getElementById('assign-error');
+    errEl.style.display = 'none';
+    try {
+      await api('PATCH', `/processes/${currentProcessId}/tasks/${encodeURIComponent(_assignTask)}`, { actor });
+      document.getElementById('modal-assign').classList.remove('open');
+      await refreshBoard();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    }
+  });
+
+  // ── Complete modal ────────────────────────────────────────────────────────
+  let _completeTask = null;
+
+  function openCompleteModal(task) {
+    _completeTask = task;
+    document.getElementById('complete-task-name').textContent = task;
+    document.getElementById('complete-error').style.display = 'none';
+    document.getElementById('complete-next-task').value = 'verify task completion';
+    populateSelect(
+      document.getElementById('complete-actor-select'),
+      [...allActors.ai, ...allActors.human]
+    );
+    document.getElementById('modal-complete').classList.add('open');
+  }
+
+  document.getElementById('complete-cancel').addEventListener('click', () => {
+    document.getElementById('modal-complete').classList.remove('open');
+  });
+
+  document.getElementById('complete-confirm').addEventListener('click', async () => {
+    const next_actor = document.getElementById('complete-actor-select').value;
+    const next_task  = document.getElementById('complete-next-task').value.trim() || 'verify task completion';
+    const errEl = document.getElementById('complete-error');
+    errEl.style.display = 'none';
+    try {
+      await api('POST', `/processes/${currentProcessId}/tasks/${encodeURIComponent(_completeTask)}/complete`, { next_actor, next_task });
+      document.getElementById('modal-complete').classList.remove('open');
+      await refreshBoard();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    }
+  });
+
+  // ── Request input modal ───────────────────────────────────────────────────
+  let _riTask = null;
+
+  function openRequestInputModal(task, currentActor) {
+    _riTask = task;
+    document.getElementById('ri-task-name').textContent = task;
+    document.getElementById('ri-error').style.display = 'none';
+    document.getElementById('ri-note').value = '';
+    populateSelect(document.getElementById('ri-ai-actor'), allActors.ai);
+    // pre-select current actor if it's an AI
+    const aiSel = document.getElementById('ri-ai-actor');
+    for (const opt of aiSel.options) {
+      if (opt.value === currentActor) { opt.selected = true; break; }
+    }
+    populateSelect(document.getElementById('ri-human-actor'), allActors.human);
+    document.getElementById('modal-request-input').classList.add('open');
+  }
+
+  document.getElementById('ri-cancel').addEventListener('click', () => {
+    document.getElementById('modal-request-input').classList.remove('open');
+  });
+
+  document.getElementById('ri-confirm').addEventListener('click', async () => {
+    const ai_actor    = document.getElementById('ri-ai-actor').value;
+    const human_actor = document.getElementById('ri-human-actor').value;
+    const note        = document.getElementById('ri-note').value.trim();
+    const errEl       = document.getElementById('ri-error');
+    errEl.style.display = 'none';
+    if (!note) { errEl.textContent = 'Please enter a note.'; errEl.style.display = 'block'; return; }
+    try {
+      await api('POST', `/processes/${currentProcessId}/tasks/${encodeURIComponent(_riTask)}/request-input`, { ai_actor, human_actor, note });
+      document.getElementById('modal-request-input').classList.remove('open');
+      await refreshBoard();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+    }
+  });
+
+  // ── Close modals on overlay click ─────────────────────────────────────────
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) overlay.classList.remove('open');
+    });
+  });
+
+  // ── Utility ───────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  loadActors().catch(console.error);
+})();
+</script>
+</body>
+</html>
