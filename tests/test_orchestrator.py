@@ -98,7 +98,7 @@ class HybridTeamOrchestratorTests(unittest.TestCase):
 
         self.assertEqual(started, "Backend AI started implement parser and validator")
 
-    def test_finish_assigns_next_stage_owner(self):
+    def test_complete_task_assigns_next_stage_owner(self):
         orchestrator = HybridTeamOrchestrator()
         assignments = orchestrator.distribute(
             "Build CSV import with validation and duplicate detection."
@@ -119,6 +119,44 @@ class HybridTeamOrchestratorTests(unittest.TestCase):
             Assignment("QA human", "verify task completion"),
             updated,
         )
+
+    def test_complete_task_can_assign_deploy_to_test_server_stage(self):
+        orchestrator = HybridTeamOrchestrator()
+        assignments = orchestrator.distribute(
+            "Build CSV import with validation and duplicate detection."
+        )
+
+        updated, completion_status = orchestrator.complete_task(
+            assignments,
+            "create test cases",
+            "DevOps AI",
+            "deploy to the test server",
+        )
+
+        self.assertEqual(
+            completion_status,
+            "QA AI finished create test cases; DevOps AI assigned to deploy to the test server",
+        )
+        self.assertIn(
+            Assignment("DevOps AI", "deploy to the test server"),
+            updated,
+        )
+
+    def test_list_ai_actors_includes_senior_dev_architect_and_qa(self):
+        orchestrator = HybridTeamOrchestrator()
+        ai_actors = orchestrator.list_ai_actors()
+
+        self.assertIn("Senior Dev AI", ai_actors)
+        self.assertIn("Architect AI", ai_actors)
+        self.assertIn("QA AI", ai_actors)
+
+    def test_list_human_actors_includes_same_core_roles(self):
+        orchestrator = HybridTeamOrchestrator()
+        human_actors = orchestrator.list_human_actors()
+
+        self.assertIn("Senior Dev human", human_actors)
+        self.assertIn("Architect human", human_actors)
+        self.assertIn("QA human", human_actors)
 
 
 if __name__ == "__main__":

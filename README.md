@@ -36,3 +36,9 @@ Manual assignment support:
 - Add a new task with a specific human/agent assignment
 - Start a task in work and get `"<actor> started <task>"` status output
 - Complete a task and automatically assign the next stage (for example, `verify task completion`)
+- Next-stage examples include operational handoff tasks like `deploy to the test server`
+
+Actor catalogs:
+
+- AI agents: Senior Dev AI, Architect AI, QA AI, Backend AI, Docs AI, DevOps AI
+- Human team: Senior Dev human, Architect human, QA human, PM human, Human engineer

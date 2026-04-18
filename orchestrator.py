@@ -16,12 +16,41 @@ class BoardItem:
 
 
 class HybridTeamOrchestrator:
+    AI_ACTORS = [
+        "Senior Dev AI",
+        "Architect AI",
+        "QA AI",
+        "Backend AI",
+        "Docs AI",
+        "DevOps AI",
+    ]
+    HUMAN_ACTORS = [
+        "Senior Dev human",
+        "Architect human",
+        "QA human",
+        "PM human",
+        "Human engineer",
+    ]
+
+    STATUS_BY_EXECUTOR = {
+        "PM human": "waiting for PM",
+        "Backend AI": "backend AI working",
+        "QA AI": "QA AI finished",
+        "Human engineer": "human review pending",
+    }
+
     @staticmethod
     def _infer_actor_group(actor: str) -> str:
         normalized = actor.lower()
         if "human" in normalized or "engineer" in normalized or "pm" in normalized:
             return "human team"
         return "AI agents"
+
+    def list_ai_actors(self) -> list[str]:
+        return list(self.AI_ACTORS)
+
+    def list_human_actors(self) -> list[str]:
+        return list(self.HUMAN_ACTORS)
 
     def distribute(self, work_item: str) -> list[Assignment]:
         normalized = work_item.lower()
@@ -49,34 +78,18 @@ class HybridTeamOrchestrator:
         return assignments
 
     def status_changes(self, assignments: list[Assignment]) -> list[str]:
-        status_by_executor = {
-            "PM human": "waiting for PM",
-            "Backend AI": "backend AI working",
-            "QA AI": "QA AI finished",
-            "Human engineer": "human review pending",
-        }
         statuses = [
-            status_by_executor[assignment.executor]
+            self.STATUS_BY_EXECUTOR[assignment.executor]
             for assignment in assignments
-            if assignment.executor in status_by_executor
+            if assignment.executor in self.STATUS_BY_EXECUTOR
         ]
         statuses.append("release package ready")
         return statuses
 
     def project_board(self, assignments: list[Assignment]) -> list[BoardItem]:
-        actor_groups = {
-            "PM human": "human team",
-            "Human engineer": "human team",
-            "Backend AI": "AI agents",
-            "QA AI": "AI agents",
-            "Docs AI": "AI agents",
-        }
         return [
             BoardItem(
-                actor_group=actor_groups.get(
-                    assignment.executor,
-                    self._infer_actor_group(assignment.executor),
-                ),
+                actor_group=self._infer_actor_group(assignment.executor),
                 actor=assignment.executor,
                 task=assignment.task,
             )
