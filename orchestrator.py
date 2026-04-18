@@ -217,7 +217,7 @@ class HybridTeamOrchestrator:
         human_actor: str,
         note: str,
     ) -> tuple[ProcessState, Notification]:
-        if ai_actor not in self.AI_ACTORS and not ai_actor.lower().endswith(" ai"):
+        if ai_actor not in self.AI_ACTORS:
             raise ValueError("Only AI actors can request human input")
 
         updated_cards = []
